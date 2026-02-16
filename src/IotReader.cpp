@@ -65,8 +65,8 @@ const uint8_t nfcId0Offset = 2U;
 
 IotReader::IotReader() {
   m_iotRd = std::make_shared<ptxIoTRd_t>();
-  m_ndefComp = std::make_unique<ptxNDEF_t>();
-  m_t4tComp = std::make_unique<ptxT4T_t>();
+  m_ndefComp = std::unique_ptr<ptxNDEF_t>(new ptxNDEF_t());
+  m_t4tComp = std::unique_ptr<ptxT4T_t>(new ptxT4T_t());
   m_activeCard.protocol = CardProtocol::Undefined;
 }
 
