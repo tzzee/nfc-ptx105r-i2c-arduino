@@ -50,7 +50,7 @@
 
 #include <Arduino.h>
 #include <Wire.h>
-
+#include <cstring>
 #include <algorithm>
 
 #include "ptxPLAT_INT.h"
@@ -60,16 +60,75 @@ ptxPLAT_GPIO_t gpioCtx;
 const int pinIRQ = 9;
 const int clockSpeed = 100000;
 const uint8_t deviceAddress = 0x4C;
+
+bool ptxPlatWireInit(int *irqPin) {
+  if (irqPin != nullptr) {
+    *irqPin = pinIRQ;
+    pinMode(*irqPin, INPUT_PULLUP);
+  }
+  Wire.setClock(clockSpeed);
+  Wire.begin();
+  return true;
+}
+
+bool ptxPlatWireDeinit() {
+  return true;
+}
+
+bool ptxPlatWireTrx(const uint8_t *txBuf[], size_t txLen[], size_t numTxBuffers,
+                    uint8_t *rxBuf[], size_t *rxLen[], size_t numRxBuffers,
+                    uint8_t flags) {
+  for (size_t i = 0; i < numTxBuffers; i++) {
+    Wire.beginTransmission(deviceAddress);
+    if (txBuf[i] && txLen[i]) {
+      const bool restartRequired =
+          (flags & PTX_PLAT_TRX_FLAGS_I2C_RESTART_CONDITION) &&
+          (i == numTxBuffers - 1);
+      Wire.write(txBuf[i], txLen[i]);
+      Wire.endTransmission(!restartRequired);
+    }
+  }
+
+  if (rxBuf && rxLen) {
+    for (size_t i = 0; i < numRxBuffers; i++) {
+      const size_t length = *rxLen[i];
+      uint8_t *memIndex = rxBuf[i];
+      if (memIndex && length) {
+        Wire.requestFrom(static_cast<uint8_t>(deviceAddress),
+                         static_cast<uint8_t>(std::min<std::size_t>(length, 255U)),
+                         static_cast<uint8_t>(1));
+        while (Wire.available()) {
+          *memIndex = static_cast<uint8_t>(Wire.read());
+          memIndex++;
+        }
+      }
+    }
+  }
+  return true;
+}
 }  // namespace
+
+extern "C" {
+bool __attribute__((weak)) ptxPlatBridgeInit(int *irqPin) {
+  return ptxPlatWireInit(irqPin);
+}
+bool __attribute__((weak)) ptxPlatBridgeDeinit() {
+  return ptxPlatWireDeinit();
+}
+bool __attribute__((weak)) ptxPlatBridgeTrx(const uint8_t *txBuf[], size_t txLen[], size_t numTxBuffers,
+                                            uint8_t *rxBuf[], size_t *rxLen[], size_t numRxBuffers,
+                                            uint8_t flags) {
+  return ptxPlatWireTrx(txBuf, txLen, numTxBuffers, rxBuf, rxLen, numRxBuffers, flags);
+}
+}
 
 ptxStatus_t ptxPlat_i2cInit(ptxPLAT_GPIO_t **gpio) {
   if (gpio != nullptr) {
     memset(&gpioCtx, 0, sizeof(gpioCtx));
-    gpioCtx.pinIRQ = pinIRQ;
+    if (!ptxPlatBridgeInit(&gpioCtx.pinIRQ)) {
+      return PTX_STATUS(ptxStatus_Comp_PLAT, ptxStatus_InternalError);
+    }
     *gpio = &gpioCtx;
-    pinMode(gpioCtx.pinIRQ, INPUT_PULLUP);
-    Wire.setClock(clockSpeed);  // Sets the I2C Communication to 100 KHz
-    Wire.begin();               // Join I2C bus
     return ptxStatus_Success;
   } else {
     return PTX_STATUS(ptxStatus_Comp_PLAT, ptxStatus_InvalidParameter);
@@ -78,8 +137,9 @@ ptxStatus_t ptxPlat_i2cInit(ptxPLAT_GPIO_t **gpio) {
 
 ptxStatus_t ptxPlat_i2cDeinit() {
   memset(&gpioCtx, 0, sizeof(gpioCtx));
-  Wire.end();
-
+  if (!ptxPlatBridgeDeinit()) {
+    return PTX_STATUS(ptxStatus_Comp_PLAT, ptxStatus_InternalError);
+  }
   return ptxStatus_Success;
 }
 
@@ -87,36 +147,8 @@ ptxStatus_t ptxPlat_i2cTrx(const uint8_t *txBuf[], size_t txLen[],
                            size_t numTxBuffers, uint8_t *rxBuf[],
                            size_t *rxLen[], size_t numRxBuffers,
                            uint8_t flags) {
-  auto status = ptxStatus_Success;
-
-  /** Tx part of the overall transaction (Attention: I2C may not send anything
-   * at all - just receive). */
-  for (size_t i = 0; i < numTxBuffers; i++) {
-    Wire.beginTransmission(deviceAddress);
-    if (txBuf[i] && txLen[i]) {
-      const bool restartRequired =
-          (flags & PTX_PLAT_TRX_FLAGS_I2C_RESTART_CONDITION) &&
-          (i == numTxBuffers - 1);
-
-      Wire.write(txBuf[i], txLen[i]);          // Sends Bytes in the Buffer
-      Wire.endTransmission(!restartRequired);  // restart required
-    }
+  if (!ptxPlatBridgeTrx(txBuf, txLen, numTxBuffers, rxBuf, rxLen, numRxBuffers, flags)) {
+    return PTX_STATUS(ptxStatus_Comp_PLAT, ptxStatus_InternalError);
   }
-
-  if (!status && rxBuf && rxLen) {
-    for (size_t i = 0; i < numRxBuffers; i++) {
-      const size_t length = *rxLen[i];
-      uint8_t *memIndex = rxBuf[i];
-      if (memIndex && length) {
-        Wire.requestFrom(deviceAddress, length, true);
-
-        while (Wire.available()) {
-          *memIndex = static_cast<uint8_t>(Wire.read());  // Receives a Byte
-          memIndex++;
-        }
-      }
-    }
-  }
-
-  return status;
+  return ptxStatus_Success;
 }
