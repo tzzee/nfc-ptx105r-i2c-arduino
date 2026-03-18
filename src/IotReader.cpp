@@ -482,6 +482,7 @@ bool IotReader::pollingStart(const PollingConfig &config) {
   rfDiscoveryConfig.IdleTime = config.idleTime;
   rfDiscoveryConfig.Discover_Mode = config.discoverMode;
   rfDiscoveryConfig.EnableStandBy = config.enableStandBy;
+  rfDiscoveryConfig.ContinuousField = config.continuousField;
 
   auto const status =
       ptxIoTRd_Initiate_Discovery(m_iotRd.get(), &rfDiscoveryConfig);

@@ -150,6 +150,7 @@ typedef struct iotRd_pollingConfig {
                             Low-Power Card Detection (LPCD), 2-255 = LPCD with
                             every n-th Cycle Regular Polling */
   uint8_t enableStandBy; /** Activates Stand-by mode when LPCD is used. */
+  uint8_t continuousField; /** If 1, keep RF-field constantly on without polling modulation. */
 } PollingConfig;
 
 /**
