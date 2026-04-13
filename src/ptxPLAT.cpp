@@ -50,7 +50,8 @@ ptxPlat_t platform;
 }  // namespace
 
 ptxStatus_t ptxPLAT_AllocAndInit(
-    ptxPlat_t **plat, [[maybe_unused]] ptxPLAT_ConfigPars *initParams) {
+    ptxPlat_t **plat, ptxPLAT_ConfigPars *initParams) {
+  (void)initParams;
   memset(&platform, 0, sizeof(platform));
   platform.CompId = ptxStatus_Comp_PLAT;
 #if defined(PTX_INTF_UART)
@@ -147,14 +148,16 @@ uint16_t ptxDBGPORT_Write(char *message) {
   return ptxStatus_Success;
 }
 
-ptxStatus_t ptxPLAT_TRx([[maybe_unused]] struct ptxPlat *plat, uint8_t *txBuf[],
+ptxStatus_t ptxPLAT_TRx(struct ptxPlat *plat, uint8_t *txBuf[],
                         size_t txLen[], size_t numTxBuffers, uint8_t *rxBuf[],
-                        size_t *rxLen[], size_t numRxBuffers,
-                        [[maybe_unused]] uint8_t flags) {
+                        size_t *rxLen[], size_t numRxBuffers, uint8_t flags) {
 #if !defined(PTX_INTF_I2C)
+  (void)flags;
   if (plat == nullptr) {
     return PTX_STATUS(ptxStatus_Comp_PLAT, ptxStatus_InvalidParameter);
   }
+#else
+  (void)plat;
 #endif
 #if defined(PTX_INTF_UART)
   return ptxPlat_uartTrx(plat->Uart, const_cast<const uint8_t **>(txBuf), txLen,
@@ -168,10 +171,11 @@ ptxStatus_t ptxPLAT_TRx([[maybe_unused]] struct ptxPlat *plat, uint8_t *txBuf[],
 #endif
 }
 
-ptxStatus_t ptxPLAT_WaitForInterrupt([[maybe_unused]] struct ptxPlat *plat) {
+ptxStatus_t ptxPLAT_WaitForInterrupt(struct ptxPlat *plat) {
   auto status = ptxStatus_Success;
 
 #if defined(PTX_INTF_UART)
+  (void)plat;
   yield();
 #else
   if (plat != nullptr) {

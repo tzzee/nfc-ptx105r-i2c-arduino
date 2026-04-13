@@ -160,7 +160,8 @@ void printNdefTextRecord(const NdefRecord &record) {
   printPayload(record.payload);
 }
 
-void printNdefEmptyRecord([[maybe_unused]] const NdefRecord &record) {
+void printNdefEmptyRecord(const NdefRecord &record) {
+  (void)record;
   Serial.println("Empty message");
 }
 }  // namespace PtxIotReader
