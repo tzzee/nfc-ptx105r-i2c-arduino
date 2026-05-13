@@ -77,7 +77,10 @@ ptxStatus_t ptxPLAT_Deinit(struct ptxPlat *plat) {
   return status;
 }
 
-ptxStatus_t ptxPLAT_ResetChip(ptxPlat_t *) { return ptxStatus_Success; }
+ptxStatus_t ptxPLAT_ResetChip(ptxPlat_t *) {
+  // No hardware reset pin — return NotImplemented so ptxNSC_Reset falls back to SoftReset.
+  return PTX_STATUS(ptxStatus_Comp_PLAT, ptxStatus_NotImplemented);
+}
 
 ptxStatus_t ptxPLAT_GetInitializedTimer(struct ptxPlat *plat,
                                         struct ptxPlatTimer **) {
